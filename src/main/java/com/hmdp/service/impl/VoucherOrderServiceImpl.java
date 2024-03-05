@@ -10,6 +10,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -40,6 +42,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
+    @Resource
+    private RedissonClient redissonClient;
+
     /**
      * 秒杀下单
      * @param voucherId
@@ -64,11 +69,12 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
         // 5.一人一单---Solved 重复下单问题
         Long userId = UserHolder.getUser().getId();
-        // 若采用方法内锁代码块的方式，有可能出现锁释放但spring管理的事务未提交的情况
+        // 若采用方法内锁代码块的方式，可能出现锁释放但spring管理的事务未提交的情况
         // 创建锁对象
-        SimpleRedisLock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
+        // SimpleRedisLock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
+        RLock lock = redissonClient.getLock("lock:order:" + userId);
         // 获取锁
-        boolean isLock = lock.tryLock(5L);
+        boolean isLock = lock.tryLock();
         if(!isLock){
             // 获取锁失败
             return Result.fail("不允许重复下单！");
