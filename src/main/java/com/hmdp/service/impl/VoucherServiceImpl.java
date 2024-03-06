@@ -46,5 +46,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         seckillVoucher.setBeginTime(voucher.getBeginTime());
         seckillVoucher.setEndTime(voucher.getEndTime());
         seckillVoucherService.save(seckillVoucher);
+        // 保存秒杀库存到redis当中 手动整了
+        // 新增秒杀优惠卷的同时，将优惠卷信息保存到Redis中
     }
 }

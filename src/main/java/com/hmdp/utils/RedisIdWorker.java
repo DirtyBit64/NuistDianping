@@ -9,6 +9,9 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 
+/**
+ * 基于Redis的简单全局ID生成器
+ */
 @Component
 public class RedisIdWorker {
 
