@@ -1,6 +1,7 @@
 package com.hmdp.controller;
 
 
+import cn.hutool.core.bean.BeanUtil;
 import com.hmdp.dto.LoginFormDTO;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 
 /**
@@ -48,9 +50,9 @@ public class UserController {
      * @param loginForm 登录参数，包含手机号、验证码；或者手机号、密码
      */
     @PostMapping("/login")
-    public Result login(@RequestBody LoginFormDTO loginForm, HttpSession session){
+    public Result login(@RequestBody LoginFormDTO loginForm){
         // 实现登录功能
-        return userService.login(loginForm, session);
+        return userService.login(loginForm);
     }
 
     /**
@@ -58,9 +60,11 @@ public class UserController {
      * @return 无
      */
     @PostMapping("/logout")
-    public Result logout(){
-        // TODO 实现登出功能
-        return Result.fail("功能未完成");
+    public Result logout(HttpServletRequest request){
+        // TODO 待实现
+        // 获取请求头中的token
+        String token = request.getHeader("authorization");
+        return userService.logout(token);
     }
 
     @GetMapping("/me")
@@ -82,5 +86,17 @@ public class UserController {
         info.setUpdateTime(null);
         // 返回
         return Result.ok(info);
+    }
+
+    @GetMapping("/{id}")
+    public Result queryUserById(@PathVariable("id") Long userId){
+        // 查询详情
+        User user = userService.getById(userId);
+        if (user == null) {
+            return Result.ok();
+        }
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        // 返回
+        return Result.ok(userDTO);
     }
 }

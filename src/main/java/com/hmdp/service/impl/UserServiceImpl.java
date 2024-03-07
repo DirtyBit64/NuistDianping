@@ -2,6 +2,7 @@ package com.hmdp.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.UUID;
+import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.LoginFormDTO;
@@ -68,10 +69,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     /**
      * 登录功能
      * @param loginForm
-     * @param session
      * @return
      */
-    public Result login(LoginFormDTO loginForm, HttpSession session) {
+    public Result login(LoginFormDTO loginForm) {
         // 1.校验手机号
         String phone = loginForm.getPhone();
         if(RegexUtils.isPhoneInvalid(phone)){
@@ -116,6 +116,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 8.返回token，前端保存到用户浏览器
         return Result.ok(token);
     }
+
+    /**
+     * 登出业务
+     * @param token
+     * @return
+     */
+    public Result logout(String token) {
+        // 直接删除redis中的token
+        String tokenKey = LOGIN_USER_KEY + token;
+        Boolean delete = stringRedisTemplate.delete(tokenKey);
+        if(BooleanUtil.isFalse(delete)){
+            return Result.fail("登出失败");
+        }
+        return Result.ok("拜拜，下次见呦！");
+    }
+
 
     private User createUserWithPhone(String phone) {
         // 1.创建用户

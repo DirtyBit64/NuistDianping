@@ -126,7 +126,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                     VoucherOrder voucherOrder = BeanUtil.fillBeanWithMap(values, new VoucherOrder(), false);
                     // 3. 获取成功，创建订单
                     handleVoucherOrder(voucherOrder);
-                    // 4. TODO ACK确认——异常
+                    // 4. ACK确认——异常
                     stringRedisTemplate.opsForStream().acknowledge(
                             queueName,
                             "g1",
