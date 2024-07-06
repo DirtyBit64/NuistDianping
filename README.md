@@ -8,6 +8,7 @@ Java_version == 1.8
 
 ## :label: TODO 
 - [ ] 使用专业的消息队列框架替换优惠券秒杀业务逻辑中采用Stream消息队列
+- [ ] 使用k8s部署并上线
 
 **Installation:**
 
