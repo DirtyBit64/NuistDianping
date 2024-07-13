@@ -1,6 +1,8 @@
 package com.hmdp;
 
 import com.hmdp.entity.Shop;
+import com.hmdp.entity.Voucher;
+import com.hmdp.service.IVoucherService;
 import com.hmdp.service.impl.ShopServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
 import org.junit.Test;
@@ -12,6 +14,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,9 +35,14 @@ public class HmDianPingApplicationTests {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    @Resource
+    private IVoucherService voucherService;
+
     @Test
     public void testLogical(){
-        shopService.saveShop2Redis(3L, 60L);
+        for(long id = 1; id < 15; id++) {
+            shopService.saveShop2Redis(id, 60L);
+        }
     }
 
     private final ExecutorService es = Executors.newFixedThreadPool(300);
@@ -52,6 +60,22 @@ public class HmDianPingApplicationTests {
         }
         // 防止主线程结束太快关闭redis连接导致redis任务中断
         Thread.sleep(10 * 1000);
+    }
+
+    // 手动创建优惠券信息
+    @Test
+    public void createVoucher(){
+        Voucher voucher = new Voucher();
+        voucher.setTitle("并发测试！！！");
+        voucher.setActualValue(800L);
+        voucher.setPayValue(120L);
+        voucher.setType(1);
+        // 烤肉
+        voucher.setShopId(2L);
+        voucher.setStock(100);
+        voucher.setBeginTime(LocalDateTime.now());
+        voucher.setEndTime(LocalDateTime.now().plusSeconds(60 * 10));
+        voucherService.addSeckillVoucher(voucher);
     }
 
     @Test

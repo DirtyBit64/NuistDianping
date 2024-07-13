@@ -2,7 +2,6 @@ package com.hmdp.service.impl;
 
 import cn.hutool.json.JSONUtil;
 import com.hmdp.dto.Result;
-import com.hmdp.entity.Shop;
 import com.hmdp.entity.ShopType;
 import com.hmdp.mapper.ShopTypeMapper;
 import com.hmdp.service.IShopTypeService;
@@ -16,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import static com.hmdp.utils.RedisConstants.CACHE_SHOPTYPE_KEY;
+import static com.hmdp.constant.RedisConstants.CACHE_SHOPTYPE_KEY;
 
 /**
  * <p>

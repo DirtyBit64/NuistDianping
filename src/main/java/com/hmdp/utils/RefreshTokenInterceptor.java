@@ -2,6 +2,7 @@ package com.hmdp.utils;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
+import com.hmdp.constant.RedisConstants;
 import com.hmdp.dto.UserDTO;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.servlet.HandlerInterceptor;

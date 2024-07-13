@@ -1,6 +1,7 @@
 package com.hmdp.utils;
 
 import cn.hutool.core.lang.UUID;
+import com.hmdp.constant.SystemConstants;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -10,7 +11,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 利用Redis实现简单的分布式锁
+ * 现用Redisson替代
  */
+@Deprecated
 public class SimpleRedisLock implements ILock{
 
     private String name;
@@ -20,7 +23,7 @@ public class SimpleRedisLock implements ILock{
     private static final DefaultRedisScript<Long> UNLOCK_SCRIPT;
     static {
         UNLOCK_SCRIPT = new DefaultRedisScript<>();
-        UNLOCK_SCRIPT.setLocation(new ClassPathResource("unlock.lua"));
+        UNLOCK_SCRIPT.setLocation(new ClassPathResource(SystemConstants.UNLOCK_LUA));
         UNLOCK_SCRIPT.setResultType(Long.class);
     }
 
@@ -46,20 +49,5 @@ public class SimpleRedisLock implements ILock{
                 ,Collections.singletonList(KEY_PREFIX + name)
                 ,ID_PREFIX + Thread.currentThread().getId());
     }
-
-    /*
-     @Override
-     public void unlock() {
-     // 获取线程标识
-     String threadId = ID_PREFIX + Thread.currentThread().getId();
-     // 获取锁中的标示
-     String id = stringRedisTemplate.opsForValue().get(KEY_PREFIX + name);
-     // 判断id是否一致
-     if(threadId.equals(id)){
-     stringRedisTemplate.delete(KEY_PREFIX + name);
-     }
-     }
-     */
-
 
 }

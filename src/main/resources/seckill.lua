@@ -3,8 +3,6 @@
 local voucherId = ARGV[1]
 -- 1.2用户id
 local userId = ARGV[2]
--- 1.3订单id
-local orderId = ARGV[3]
 
 -- 2.数据key
 -- 2.1库存key
@@ -28,7 +26,8 @@ redis.call('incrby', stockKey, -1)
 --3.4下单(保存用户) sadd orderKey userId
 redis.call('sadd', orderKey, userId)
 
--- 3.5 发送消息到消息队列 XADD
-redis.call('xadd', 'stream.order', '*', 'userId',userId, 'voucherId',voucherId, 'id',orderId)
+-- 修改：生产消息到kafka
+---- 3.5 发送消息到消息队列 XADD
+--redis.call('xadd', 'stream.order', '*', 'userId',userId, 'voucherId',voucherId, 'id',orderId)
 
 return 0

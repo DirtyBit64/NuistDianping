@@ -1,12 +1,14 @@
 package com.hmdp.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.constant.RedisConstants;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Voucher;
 import com.hmdp.mapper.VoucherMapper;
 import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherService;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,9 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
     @Resource
     private ISeckillVoucherService seckillVoucherService;
 
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
     @Override
     public Result queryVoucherOfShop(Long shopId) {
         // 查询优惠券信息
@@ -46,7 +51,9 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         seckillVoucher.setBeginTime(voucher.getBeginTime());
         seckillVoucher.setEndTime(voucher.getEndTime());
         seckillVoucherService.save(seckillVoucher);
-        // 保存秒杀库存到redis当中 手动整了
         // 新增秒杀优惠卷的同时，将优惠卷信息保存到Redis中
+        String voucherId = String.valueOf(voucher.getId());
+        stringRedisTemplate.opsForValue().set(RedisConstants.SECKILL_STOCK_KEY + voucherId,
+                String.valueOf(voucher.getStock()));
     }
 }

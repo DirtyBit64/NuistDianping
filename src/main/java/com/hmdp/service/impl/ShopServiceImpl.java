@@ -4,6 +4,7 @@ import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.hmdp.constant.ShopConstants;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
 import com.hmdp.mapper.ShopMapper;
@@ -11,11 +12,10 @@ import com.hmdp.service.IShopService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.RedisData;
-import com.hmdp.utils.SystemConstants;
+import com.hmdp.constant.SystemConstants;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.GeoResults;
-import org.springframework.data.geo.Point;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.domain.geo.GeoReference;
@@ -30,7 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static com.hmdp.utils.RedisConstants.*;
+import static com.hmdp.constant.RedisConstants.*;
 
 /**
  * <p>
@@ -67,14 +67,11 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
                 .queryWithLogicalExpire(CACHE_SHOP_KEY, id, Shop.class, this::getById, LOCK_SHOP_KEY, CACHE_SHOP_TTL, TimeUnit.MINUTES);
 
         if (shop == null) {
-            return Result.fail("店铺不存在");
+            return Result.fail(ShopConstants.SHOP_NOT_FOUND);
         }
         // 返回
         return Result.ok(shop);
     }
-
-    // 线程池
-    private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(10);
 
     /**
      * 缓存击穿逻辑过期解决方案
@@ -87,6 +84,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      * @param id
      * @return
      */
+    @Deprecated
     public Shop queryWithMutex(Long id){
         // 1.从redis查询商铺缓存
         String shopKey = CACHE_SHOP_KEY + id;
@@ -178,7 +176,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      public Result update(Shop shop) {
         Long id = shop.getId();
         if(id == null){
-            return Result.fail("店铺id不能为空");
+            return Result.fail(ShopConstants.SHOP_ID_EMPTY);
         }
         // 1.更新数据库
         updateById(shop);
@@ -248,6 +246,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         return Result.ok(shops);
     }
 
+    // 若采用逻辑过期方式缓存店铺信息，则在应用启动前从数据库读取数据到redis
     public void saveShop2Redis(Long id, Long expireSeconds){
         // 1.查询店铺数据
         Shop shop = getById(id);
@@ -258,8 +257,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         // 3.写入Redis
         stringRedisTemplate.opsForValue().set(CACHE_SHOP_KEY + id, JSONUtil.toJsonStr(redisData));
     }
-
-
 
     /**
      * 获取互斥锁
