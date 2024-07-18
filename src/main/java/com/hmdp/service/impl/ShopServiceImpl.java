@@ -2,6 +2,7 @@ package com.hmdp.service.impl;
 
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.constant.ShopConstants;
@@ -17,6 +18,7 @@ import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.GeoResults;
 import org.springframework.data.redis.connection.RedisGeoCommands;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.domain.geo.GeoReference;
 import org.springframework.stereotype.Service;
@@ -29,6 +31,7 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static com.hmdp.constant.RedisConstants.*;
 
@@ -49,19 +52,12 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     @Resource
     private CacheClient cacheClient;
 
-    /**
+    /** TODO 咖啡因
      * 根据id查询商户信息
      * @param id
      * @return
      */
     public Result queryById(Long id) {
-        // 缓存穿透
-//        Shop shop = cacheClient
-//                .queryWithPassThrough(CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
-
-        // 自定义互斥锁解决缓存击穿
-        // Shop shop = queryWithMutex(id);
-
         // 逻辑过期解决缓存击穿
         Shop shop = cacheClient
                 .queryWithLogicalExpire(CACHE_SHOP_KEY, id, Shop.class, this::getById, LOCK_SHOP_KEY, CACHE_SHOP_TTL, TimeUnit.MINUTES);
@@ -72,12 +68,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         // 返回
         return Result.ok(shop);
     }
-
-    /**
-     * 缓存击穿逻辑过期解决方案
-     * @param id
-     * @return
-     */
 
     /**
      * 缓存击穿互斥锁解决方案
@@ -187,7 +177,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     }
 
     /**
-     * 根据类型查询商铺
+     * 根据type滚动分页查询商铺
      * @param typeId 商铺类型id
      * @param current 当前页码
      * @param x 如果非null，则表示按照坐标查
@@ -224,6 +214,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             // 没有下一页
             return Result.ok(Collections.emptyList());
         }
+        // 要反馈给用户的商铺id结合
         List<Long> ids = new ArrayList<>(content.size());
         Map<String, Distance> distanceMap = new HashMap<>(content.size());
         content.stream().skip(from).forEach(result -> {
@@ -234,14 +225,33 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             Distance distance = result.getDistance();
             distanceMap.put(shopIdStr, distance);
         });
-        // 5.根据id查询Shop
-        String idStr = StrUtil.join(",", ids);
-        List<Shop> shops = query().in("id", ids)
-                .last("order by field(id," + idStr + ")").list();
-        // 5.1将距离与店铺绑定
-        for (Shop shop : shops) {
+        // 5.根据ids桉序查询Shop
+        // 5.1 采用管道去Redis中批量查询商铺缓存信息
+        List<Object> shopJsonList = stringRedisTemplate.executePipelined((RedisCallback<String>) connection -> {
+            for (Long id : ids) {
+                String shopKey = CACHE_SHOP_KEY + id;
+                connection.get(shopKey.getBytes());
+            }
+            return null;
+        });
+        // 5.2 处理结果
+        List<Shop> shops = new ArrayList<>();
+        for (Object object : shopJsonList) {
+            if (object == null) {
+                // 商铺信息无效，直接跳过
+                continue;
+            }
+            String shopStr = (String) object;
+            // 5.3 命中，需要先把json反序列化为对象
+            RedisData redisData = JSONUtil.toBean(shopStr, RedisData.class);
+            JSONObject data = (JSONObject) redisData.getData();
+            Shop shop = JSONUtil.toBean(data, Shop.class);
+            // 弱一致性：逻辑过期与否都直接返回，当用户点击具体店铺信息时再缓存重建
+            // 5.5 绑定distance，并反馈用户
             shop.setDistance(distanceMap.get(shop.getId().toString()).getValue());
+            shops.add(shop);
         }
+
         // 6.返回
         return Result.ok(shops);
     }
