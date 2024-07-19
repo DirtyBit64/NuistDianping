@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hmdp.mapper.VoucherOrderMapper">
+    <update id="updateBatch" parameterType="VoucherOrder">
+        update tb_voucher_order
+        set status=#{status}
+        where id=#{id}
+    </update>
+
+
+    <select id="getByStatusAndOrderTimeLT" resultType="com.hmdp.entity.VoucherOrder">
+        select * from tb_voucher_order where status=#{status} and #{orderTime} > create_time;
+    </select>
+</mapper>

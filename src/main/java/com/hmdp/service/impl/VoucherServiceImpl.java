@@ -13,7 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <p>
@@ -54,6 +57,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         // 新增秒杀优惠卷的同时，将优惠卷信息保存到Redis中
         String voucherId = String.valueOf(voucher.getId());
         stringRedisTemplate.opsForValue().set(RedisConstants.SECKILL_STOCK_KEY + voucherId,
-                String.valueOf(voucher.getStock()));
+                String.valueOf(voucher.getStock()),
+                Duration.between(seckillVoucher.getEndTime(), LocalDateTime.now()));
     }
 }

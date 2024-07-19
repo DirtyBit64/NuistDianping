@@ -39,6 +39,8 @@ public class kafkaConsumer {
         }
         // 2. 解析json
         VoucherOrder voucherOrder = JSONUtil.toBean(msg, VoucherOrder.class);
+        // 这里默认支付成功
+        voucherOrder.setStatus(2);
         // 3.获取成功，创建锁对象
         RLock lock = redissonClient.getLock(RedisConstants.LOCK_ORDER_KEY + voucherOrder.getUserId());
         // 3.1获取锁

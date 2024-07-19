@@ -11,6 +11,8 @@ import com.hmdp.service.OrderCheckService;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.protocol.types.Field;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -18,6 +20,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
 import java.util.Collections;
 
 @Service
@@ -67,6 +70,7 @@ public class OrderCheckServiceImpl implements OrderCheckService {
         voucherOrder.setId(orderId);
         voucherOrder.setUserId(userId);
         voucherOrder.setVoucherId(voucherId);
+        voucherOrder.setCreateTime(LocalDateTime.now());
         // 2.3 订单信息转为Json
         String jsonStr = JSONUtil.toJsonStr(JSONUtil.toJsonStr(voucherOrder));
         log.info("生成后台订单信息到kafka：{}", jsonStr);
