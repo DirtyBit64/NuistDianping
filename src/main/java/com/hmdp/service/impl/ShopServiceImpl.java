@@ -5,6 +5,8 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.hmdp.constant.CaffeineConstants;
 import com.hmdp.constant.ShopConstants;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
@@ -21,6 +23,7 @@ import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.domain.geo.GeoReference;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,7 +43,7 @@ import static com.hmdp.constant.RedisConstants.*;
  *  服务实现类
  * </p>
  *
- * @author 虎哥
+ * @author 龙哥
  * @since 2021-12-22
  */
 @Service
@@ -51,21 +54,27 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     @Resource
     private CacheClient cacheClient;
+    @Resource
+    private Cache<String, Shop> shopCache;
 
-    /** TODO 咖啡因
+    /**
      * 根据id查询商户信息
      * @param id
      * @return
      */
     public Result queryById(Long id) {
-        // 逻辑过期解决缓存击穿
-        Shop shop = cacheClient
-                .queryWithLogicalExpire(CACHE_SHOP_KEY, id, Shop.class, this::getById, LOCK_SHOP_KEY, CACHE_SHOP_TTL, TimeUnit.MINUTES);
-
+        // 1.先查Caffeine
+        String key = CaffeineConstants.SHOP_KEY_PREFIX + id;
+        Shop shop = shopCache.getIfPresent(key);
+        // 2.再查Redis
+        if(shop == null){
+            shop = cacheClient.queryWithPassThrough(CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.SECONDS);
+        }
+        // 无效查询
         if (shop == null) {
             return Result.fail(ShopConstants.SHOP_NOT_FOUND);
         }
-        // 返回
+        shopCache.put(key, shop);
         return Result.ok(shop);
     }
 
@@ -123,41 +132,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     }
 
     /**
-     * 缓存穿透解决方案
-     * @param id
-     * @return
-     */
-    public Shop queryWithPassThrough(Long id) {
-        // 1.从redis查询商铺缓存
-        String shopKey = CACHE_SHOP_KEY + id;
-        String shopJson = stringRedisTemplate.opsForValue().get(shopKey);
-        // 2.判断是否存在
-        if(StrUtil.isNotBlank(shopJson)){
-            // 3.存在有效商铺信息，直接返回
-            return JSONUtil.toBean(shopJson, Shop.class);
-        }
-        // 判断缓存命中是否为空字符串
-        if(shopJson != null){
-            // 返回一个错误信息
-            return null;
-        }
-        // 4.不存在，查询数据库
-        Shop shop = getById(id);
-        // 5.数据库不存在，返回错误
-        if(shop == null){
-            // 将空值写入redis
-            stringRedisTemplate.opsForValue().set(shopKey, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
-            // 返回错误信息
-            return null;
-        }
-        // 6.存在，写入Redis
-        shopJson = JSONUtil.toJsonStr(shop);
-        stringRedisTemplate.opsForValue().set(shopKey, shopJson, CACHE_SHOP_TTL, TimeUnit.MINUTES);
-        // 7.返回
-        return shop;
-    }
-
-    /**
      * 更新店铺信息
      * @param shop
      * @return
@@ -170,14 +144,19 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
         // 1.更新数据库
         updateById(shop);
-        // 2.删除缓存
+        // 2.删除redis缓存
         stringRedisTemplate.delete(CACHE_SHOP_KEY + shop.getId());
-
+        // 3.判断本地缓存是否存在，存在说明为热点数据，进行更新
+        String key = CaffeineConstants.SHOP_KEY_PREFIX + shop.getId();
+        Shop oldShop = shopCache.getIfPresent(key);
+        if(oldShop != null){
+            shopCache.put(key, shop);
+        }
         return Result.ok();
     }
 
     /**
-     * 根据type滚动分页查询商铺
+     * 根据类型查询商铺
      * @param typeId 商铺类型id
      * @param current 当前页码
      * @param x 如果非null，则表示按照坐标查
@@ -214,7 +193,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             // 没有下一页
             return Result.ok(Collections.emptyList());
         }
-        // 要反馈给用户的商铺id结合
         List<Long> ids = new ArrayList<>(content.size());
         Map<String, Distance> distanceMap = new HashMap<>(content.size());
         content.stream().skip(from).forEach(result -> {
@@ -225,38 +203,20 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             Distance distance = result.getDistance();
             distanceMap.put(shopIdStr, distance);
         });
-        // 5.根据ids桉序查询Shop
-        // 5.1 采用管道去Redis中批量查询商铺缓存信息
-        List<Object> shopJsonList = stringRedisTemplate.executePipelined((RedisCallback<String>) connection -> {
-            for (Long id : ids) {
-                String shopKey = CACHE_SHOP_KEY + id;
-                connection.get(shopKey.getBytes());
-            }
-            return null;
-        });
-        // 5.2 处理结果
-        List<Shop> shops = new ArrayList<>();
-        for (Object object : shopJsonList) {
-            if (object == null) {
-                // 商铺信息无效，直接跳过
-                continue;
-            }
-            String shopStr = (String) object;
-            // 5.3 命中，需要先把json反序列化为对象
-            RedisData redisData = JSONUtil.toBean(shopStr, RedisData.class);
-            JSONObject data = (JSONObject) redisData.getData();
-            Shop shop = JSONUtil.toBean(data, Shop.class);
-            // 弱一致性：逻辑过期与否都直接返回，当用户点击具体店铺信息时再缓存重建
-            // 5.5 绑定distance，并反馈用户
+        // 5.根据id查询Shop
+        String idStr = StrUtil.join(",", ids);
+        List<Shop> shops = query().in("id", ids)
+                .last("order by field(id," + idStr + ")").list();
+        // 5.1将距离与店铺绑定
+        for (Shop shop : shops) {
             shop.setDistance(distanceMap.get(shop.getId().toString()).getValue());
-            shops.add(shop);
         }
-
         // 6.返回
         return Result.ok(shops);
     }
 
     // 若采用逻辑过期方式缓存店铺信息，则在应用启动前从数据库读取数据到redis
+    @Deprecated
     public void saveShop2Redis(Long id, Long expireSeconds){
         // 1.查询店铺数据
         Shop shop = getById(id);

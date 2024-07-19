@@ -4,11 +4,14 @@ import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import com.hmdp.constant.RedisConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.Resource;
 import java.time.LocalDateTime;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -20,9 +23,12 @@ import static com.hmdp.constant.RedisConstants.*;
 @Slf4j
 public class CacheClient {
 
+    @Resource
     private final StringRedisTemplate stringRedisTemplate;
     // 线程池
     private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(10);
+
+    private final Random random = new Random(1024);
 
 
     public CacheClient(StringRedisTemplate stringRedisTemplate) {
@@ -57,7 +63,7 @@ public class CacheClient {
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
     }
 
-    /**
+    /** 缓存空值方案
      * 缓存穿透按id查询
      * @param keyPrefix 键名前缀
      * @param id 查询id
@@ -76,7 +82,8 @@ public class CacheClient {
         String json = stringRedisTemplate.opsForValue().get(key);
         // 2.判断是否存在
         if(StrUtil.isNotBlank(json)){
-            // 3.存在有效信息，直接返回
+            // 3.存在有效信息,刷新TTL,并返回
+            stringRedisTemplate.expire(key, CACHE_SHOP_TTL + random.nextInt(RANDOM_BOUND), TimeUnit.SECONDS);
             return JSONUtil.toBean(json, type);
         }
         // 判断缓存命中是否为空字符串
@@ -89,17 +96,17 @@ public class CacheClient {
         // 5.数据库不存在，返回错误
         if(r == null){
             // 将空值写入redis
-            stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+            stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL, TimeUnit.SECONDS);
             // 返回错误信息
             return null;
         }
-        // 6.存在，写入Redis
-        this.set(key, r, time, unit);
+        // 6.存在，写入Redis 随机ttl防止雪崩
+        this.set(key, r, time + random.nextInt(RANDOM_BOUND), unit);
         // 7.返回
         return r;
     }
 
-    /**
+    /** 逻辑过期方案
      * 缓存击穿
      * @param keyPrefix
      * @param id
