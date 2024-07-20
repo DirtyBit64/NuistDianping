@@ -4,7 +4,9 @@ import cn.hutool.json.JSONUtil;
 import com.hmdp.constant.KafkaConstants;
 import com.hmdp.constant.OrderConstants;
 import com.hmdp.constant.RedisConstants;
+import com.hmdp.entity.Shop;
 import com.hmdp.entity.VoucherOrder;
+import com.hmdp.service.IShopService;
 import com.hmdp.service.IVoucherOrderService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -22,7 +24,8 @@ public class kafkaConsumer {
 
     @Resource
     private IVoucherOrderService voucherOrderService;
-
+    @Resource
+    private IShopService shopService;
     @Resource
     private RedissonClient redissonClient;
 
@@ -57,6 +60,23 @@ public class kafkaConsumer {
             // 释放锁
             lock.unlock();
         }
+    }
+
+    /**
+     * 处理商铺信息变更消息
+     * @param record 消息
+     */
+    @KafkaListener(topics = KafkaConstants.VOUCHER_ORDER_TOPIC, groupId = KafkaConstants.SHOP_GROUP)
+    public void handlerCacheUpdate(ConsumerRecord<String, String> record){
+        // 1.判断消息获取是否成功
+        String msg = record.value();
+        if(StringUtils.isEmpty(msg)){
+            return;
+        }
+        // 2. 解析json
+        Shop shop = JSONUtil.toBean(msg, Shop.class);
+        // 3. 更新数据库及各级缓存
+        shopService.update(shop);
     }
 
 }

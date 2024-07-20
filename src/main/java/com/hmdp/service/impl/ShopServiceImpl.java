@@ -6,6 +6,7 @@ import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.hmdp.constant.CaffeineConstants;
+import com.hmdp.constant.KafkaConstants;
 import com.hmdp.constant.ShopConstants;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
@@ -45,6 +46,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
 
     @Resource
     private CacheClient cacheClient;
@@ -132,10 +134,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      */
     @Transactional
      public Result update(Shop shop) {
-        Long id = shop.getId();
-        if(id == null){
-            return Result.fail(ShopConstants.SHOP_ID_EMPTY);
-        }
         // 1.更新数据库
         updateById(shop);
         // 2.删除redis缓存
@@ -148,6 +146,8 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
         return Result.ok();
     }
+
+
 
     /**
      * 根据类型查询商铺

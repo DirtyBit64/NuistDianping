@@ -2,11 +2,15 @@ package com.hmdp.controller;
 
 
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.hmdp.constant.KafkaConstants;
+import com.hmdp.constant.ShopConstants;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
 import com.hmdp.service.IShopService;
 import com.hmdp.constant.SystemConstants;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -25,6 +29,9 @@ public class ShopController {
 
     @Resource
     public IShopService shopService;
+
+    @Resource
+    private KafkaTemplate<String, String> kafkaTemplate;
 
     /**
      * 根据id查询商铺信息
@@ -56,7 +63,14 @@ public class ShopController {
      */
     @PutMapping
     public Result updateShop(@RequestBody Shop shop) {
-        // 写入数据库
+        Long id = shop.getId();
+        if(id == null){
+            return Result.fail(ShopConstants.SHOP_ID_EMPTY);
+        }
+        // 1.商家信息转为Json
+        String jsonStr = JSONUtil.toJsonStr(JSONUtil.toJsonStr(shop));
+        // 2.存入kafka缓存同步topic等待消费者同步各级缓存
+        kafkaTemplate.send(KafkaConstants.CACHE_UPDATE_TOPIC, String.valueOf(id), jsonStr);
         return shopService.update(shop);
     }
 
