@@ -3,6 +3,7 @@ package com.hmdp.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.hmdp.constant.BlogConstants;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.ScrollResult;
 import com.hmdp.dto.UserDTO;
@@ -15,11 +16,14 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.service.IFollowService;
 import com.hmdp.service.IUserService;
 import com.hmdp.constant.SystemConstants;
+import com.hmdp.utils.ACDet;
 import com.hmdp.utils.UserHolder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
@@ -50,6 +54,9 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    @Autowired
+    private ACDet acDet;
 
     @Override
     public Result queryHotBlog(Integer current) {
@@ -173,18 +180,27 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
      * @return
      */
     public Result saveBlog(Blog blog) {
-        // 1.保存到数据库
+        // 0.参数校验
+        if (blog.getShopId() == null){
+            return Result.fail(BlogConstants.SAVE_BLOG_NOSHOP);
+        }
+        // 1.敏感词检测
+        String sensitiveWord = acDet.detect(blog.getTitle() + blog.getContent());
+        if (!StringUtils.isEmpty(sensitiveWord)){
+            return Result.fail(BlogConstants.SAVE_BLOG_NO_SENSITIVE +sensitiveWord);
+        }
+        // 2.保存到数据库
         UserDTO userDTO = UserHolder.getUser();
         blog.setUserId(userDTO.getId());
         // 保存探店笔记->数据库
         boolean isSuccess = save(blog);
-        // 2.推送到粉丝收件箱
+        // 3.推送到粉丝收件箱
         if(!isSuccess){
             return Result.fail("新增笔记失败！");
         }
-        // 3.查询笔记作者的粉丝 select * from tb_follow where
+        // 4.查询笔记作者的粉丝 select * from tb_follow where
         List<Follow> follows = followService.query().eq("follow_user_id", userDTO.getId()).list();
-        // 4.推送给它们捏
+        // 5.推送给它们捏
         for (Follow follow : follows) {
             // 获取粉丝id
             Long userId = follow.getUserId();
@@ -192,7 +208,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
             // 存到sortedSet收件箱，时间戳为score
             stringRedisTemplate.opsForZSet().add(key, blog.getId().toString(), System.currentTimeMillis());
         }
-        return Result.ok("发布成功捏！");
+        return Result.ok(BlogConstants.SAVE_BLOG_YES);
     }
 
     /**

@@ -2,7 +2,6 @@ package com.hmdp.listener;
 
 import cn.hutool.json.JSONUtil;
 import com.hmdp.constant.KafkaConstants;
-import com.hmdp.constant.OrderConstants;
 import com.hmdp.constant.RedisConstants;
 import com.hmdp.entity.Shop;
 import com.hmdp.entity.VoucherOrder;

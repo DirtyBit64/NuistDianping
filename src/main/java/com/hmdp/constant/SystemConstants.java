@@ -10,4 +10,6 @@ public class SystemConstants {
     // lua脚本
     public static final String SECKILL_LUA = "seckill.lua";
     public static final String UNLOCK_LUA = "unlock.lua";
+    // 敏感词库
+    public static final String SENSITIVE_FILE_PATH = "sensitive.txt";
 }
