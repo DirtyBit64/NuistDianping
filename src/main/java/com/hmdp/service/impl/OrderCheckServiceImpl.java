@@ -11,13 +11,15 @@ import com.hmdp.service.OrderCheckService;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.protocol.types.Field;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
+import org.springframework.util.concurrent.FailureCallback;
+import org.springframework.util.concurrent.ListenableFuture;
+import org.springframework.util.concurrent.ListenableFutureCallback;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
@@ -75,7 +77,23 @@ public class OrderCheckServiceImpl implements OrderCheckService {
         String jsonStr = JSONUtil.toJsonStr(JSONUtil.toJsonStr(voucherOrder));
         log.info("生成后台订单信息到kafka：{}", jsonStr);
         // 2.4 发送到mq
-        kafkaTemplate.send(KafkaConstants.VOUCHER_ORDER_TOPIC, String.valueOf(voucherId), jsonStr);
+        ListenableFuture<SendResult<String, String>> sendState = kafkaTemplate.send(KafkaConstants.VOUCHER_ORDER_TOPIC, String.valueOf(voucherId), jsonStr);
+        // 为保证生产消息能顺利到达broker添加回调
+        sendState.addCallback(
+                // onSuccess 方法会在发送成功时调用
+                new ListenableFutureCallback<SendResult<String, String>>(){
+                    @Override
+                    public void onSuccess(SendResult<String, String> stringStringSendResult) {
+                        log.info("订单消息成功发至Kafka Broker");
+                    }
+                    @Override
+                    public void onFailure(Throwable throwable) {
+                        log.error("OrderCheckProducer消息发送失败, ", throwable);
+                        kafkaTemplate.send(KafkaConstants.VOUCHER_ORDER_TOPIC, String.valueOf(voucherId), jsonStr);
+                    }
+                }
+
+        );
 
         // 3.用户有购买资格，响应给用户结果；mq异步执行下单业务
         return Result.ok(orderId);
