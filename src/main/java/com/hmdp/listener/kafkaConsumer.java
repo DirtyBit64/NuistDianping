@@ -55,6 +55,7 @@ public class kafkaConsumer {
             }
             // 4.订单入库
             voucherOrderService.createVoucherOrder(voucherOrder);
+            // 如果订单创建失败抛出异常，那么捕捉到进行多次重试
         }finally {
             // 释放锁
             lock.unlock();

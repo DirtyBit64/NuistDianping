@@ -1,7 +1,11 @@
 package com.hmdp.controller;
 
 
+import com.alibaba.csp.sentinel.annotation.SentinelResource;
+import com.alibaba.csp.sentinel.slots.block.BlockException;
+import com.alibaba.csp.sentinel.slots.block.flow.FlowException;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.hmdp.config.SentinelConfig;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
@@ -9,6 +13,7 @@ import com.hmdp.service.IBlogService;
 import com.hmdp.service.IUserService;
 import com.hmdp.constant.SystemConstants;
 import com.hmdp.utils.UserHolder;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -24,6 +29,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/blog")
+@Slf4j
 public class BlogController {
 
     @Resource
@@ -54,7 +60,9 @@ public class BlogController {
     }
 
     @GetMapping("/hot")
+    @SentinelResource(value = "hotBlog", blockHandler = "flowBlockHandler")
     public Result queryHotBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
+        log.info("热点博文调用成功了！！！");
         return blogService.queryHotBlog(current);
     }
 
@@ -90,5 +98,15 @@ public class BlogController {
             @RequestParam("lastId") Long max,
             @RequestParam(value = "offset", defaultValue = "0") Integer offset){
         return blogService.queryBlogOfFollow(max, offset);
+    }
+
+    /**
+     * 限流后续操作方法
+     * @param e
+     * @return
+     */
+    public Result flowBlockHandler(Integer current,BlockException e) {
+        log.info("cnm");
+        return Result.ok(SystemConstants.FLOW_LIMIT_FAIL);
     }
 }

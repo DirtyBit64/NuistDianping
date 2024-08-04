@@ -6,7 +6,6 @@ import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.hmdp.constant.CaffeineConstants;
-import com.hmdp.constant.KafkaConstants;
 import com.hmdp.constant.ShopConstants;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
@@ -59,6 +58,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      * @return
      */
     public Result queryById(Long id) {
+        log.debug("成功访问商户:" + id);
         // 1.先查Caffeine
         String key = CaffeineConstants.SHOP_KEY_PREFIX + id;
         Shop shop = shopCache.getIfPresent(key);

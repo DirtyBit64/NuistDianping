@@ -1,8 +1,9 @@
 package com.hmdp.controller;
 
-
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
+import com.alibaba.csp.sentinel.annotation.SentinelResource;
+import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.constant.KafkaConstants;
 import com.hmdp.constant.ShopConstants;
@@ -10,6 +11,7 @@ import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
 import com.hmdp.service.IShopService;
 import com.hmdp.constant.SystemConstants;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +25,7 @@ import javax.annotation.Resource;
  * @author 虎哥
  * @since 2021-12-22
  */
+@Slf4j
 @RestController
 @RequestMapping("/shop")
 public class ShopController {
@@ -39,6 +42,7 @@ public class ShopController {
      * @return 商铺详情数据
      */
     @GetMapping("/{id}")
+    @SentinelResource(value = "queryShopById", blockHandler = "getShopNoBlockHandler")
     public Result queryShopById(@PathVariable("id") Long id) {
         return shopService.queryById(id);
     }
@@ -107,5 +111,15 @@ public class ShopController {
                 .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
         // 返回数据
         return Result.ok(page.getRecords());
+    }
+
+    /**
+     * 限流后续操作方法
+     * @param id
+     * @return
+     */
+    public static Result getShopNoBlockHandler(Long id, BlockException e) {
+        log.info("商户{}访问人数过多，触发热点参数限流!", id);
+        return Result.fail(SystemConstants.FLOW_LIMIT_FAIL);
     }
 }

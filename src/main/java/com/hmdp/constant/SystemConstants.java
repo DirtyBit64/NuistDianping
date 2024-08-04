@@ -12,4 +12,7 @@ public class SystemConstants {
     public static final String UNLOCK_LUA = "unlock.lua";
     // 敏感词库
     public static final String SENSITIVE_FILE_PATH = "sensitive.txt";
+
+    // 限流
+    public static final String FLOW_LIMIT_FAIL = "不好意思，当前访问人数过多，请您稍后再试";
 }

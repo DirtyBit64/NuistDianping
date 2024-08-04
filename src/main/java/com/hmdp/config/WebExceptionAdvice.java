@@ -1,5 +1,7 @@
 package com.hmdp.config;
 
+import com.alibaba.csp.sentinel.slots.block.BlockException;
+import com.hmdp.constant.SystemConstants;
 import com.hmdp.dto.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -13,5 +15,11 @@ public class WebExceptionAdvice {
     public Result handleRuntimeException(RuntimeException e) {
         log.error(e.toString(), e);
         return Result.fail("服务器异常");
+    }
+
+    @ExceptionHandler(BlockException.class)
+    public Result handleFlowException(BlockException e) {
+        log.error(e.toString(), e);
+        return Result.fail(SystemConstants.FLOW_LIMIT_FAIL);
     }
 }
