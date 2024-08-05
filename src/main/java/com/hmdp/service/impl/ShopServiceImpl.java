@@ -3,18 +3,21 @@ package com.hmdp.service.impl;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.extension.conditions.query.QueryChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.hmdp.constant.CaffeineConstants;
 import com.hmdp.constant.ShopConstants;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
+import com.hmdp.handler.SuggestRequirementHandlerProcess;
 import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.RedisData;
 import com.hmdp.constant.SystemConstants;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.GeoResults;
@@ -46,6 +49,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    // 良品铺子板块服务
+    @Autowired
+    private SuggestRequirementHandlerProcess suggestRequirementHandlerProcess;
 
     @Resource
     private CacheClient cacheClient;
@@ -147,7 +153,13 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         return Result.ok();
     }
 
-
+    // 根据商铺名称批量查询商户
+    @Override
+    public List<Shop> queryShopByName(List<String> shopNameList) {
+        return query()
+                .in(true, "name", shopNameList)
+                .list();
+    }
 
     /**
      * 根据类型查询商铺
@@ -158,6 +170,10 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      * @return 返回分页查询结果
      */
     public Result queryShopByType(Integer typeId, Integer current, Double x, Double y) {
+        // 0.如果访问良品铺子板块
+        if(ShopConstants.LPPZ_TYPEID.equals(typeId)){
+            return suggestRequirementHandlerProcess.process(current);
+        }
         // 1.判断是否需要根据坐标查询
         if(x == null || y == null){
             // 不需要坐标查询，按数据库查询
@@ -166,6 +182,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
                     .page(new Page<>(current, SystemConstants.DEFAULT_PAGE_SIZE));
             return Result.ok(page.getRecords());
         }
+
         // 2.计算分页参数
         int from = (current - 1) * SystemConstants.DEFAULT_PAGE_SIZE;
         int end = from + SystemConstants.DEFAULT_PAGE_SIZE;
@@ -182,7 +199,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             return Result.ok(Collections.emptyList());
         }
         List<GeoResult<RedisGeoCommands.GeoLocation<String>>> content = results.getContent();
-        // 4.1从0-end截取出from到end数据
+        // 5.1从0-end截取出from到end数据
         if(content.size() <= from){
             // 没有下一页
             return Result.ok(Collections.emptyList());
@@ -197,15 +214,15 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             Distance distance = result.getDistance();
             distanceMap.put(shopIdStr, distance);
         });
-        // 5.根据id查询Shop
+        // 6.根据id查询Shop
         String idStr = StrUtil.join(",", ids);
         List<Shop> shops = query().in("id", ids)
                 .last("order by field(id," + idStr + ")").list();
-        // 5.1将距离与店铺绑定
+        // 6.1将距离与店铺绑定
         for (Shop shop : shops) {
             shop.setDistance(distanceMap.get(shop.getId().toString()).getValue());
         }
-        // 6.返回
+
         return Result.ok(shops);
     }
 

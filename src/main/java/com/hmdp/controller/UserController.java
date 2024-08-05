@@ -61,7 +61,7 @@ public class UserController {
      */
     @PostMapping("/logout")
     public Result logout(HttpServletRequest request){
-        // TODO 待实现
+        // 待实现
         // 获取请求头中的token
         String token = request.getHeader("authorization");
         return userService.logout(token);
