@@ -12,13 +12,15 @@ Java_version == 1.8
 - [x] 新增良品铺子板块实现动态投放店铺业务
 - [x] 在Nginx上实现IP限流、封禁等机制
 
+
 **Installation:**
 Clone the NuistDianping repository from GitHub.
 ```bash
 git clone https://github.com/DirtyBit64/NuistDianping.git
 ```
 
-**PersonalBlog:**
+
+**个人博客:**
 [DirtyBit...](http://116.198.230.68:8090)
 
 ## License
