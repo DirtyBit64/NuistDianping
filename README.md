@@ -13,14 +13,14 @@ Java_version == 1.8
 - [x] 在Nginx上实现IP限流、封禁等机制
 
 
-**Installation:**
+## **Installation:**
 Clone the NuistDianping repository from GitHub.
 ```bash
 git clone https://github.com/DirtyBit64/NuistDianping.git
 ```
 
 
-**个人博客:**
+## **个人博客:**
 [DirtyBit...](http://116.198.230.68:8090)
 
 ## License
